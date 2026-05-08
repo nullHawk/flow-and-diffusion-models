@@ -14,7 +14,8 @@ class BrownianMotion(SDE):
         Returns:
             - drift: shape (bs, dim)
         """
-        return torch.zeros_like(xt)
+        ut = torch.zeros_like(xt)
+        return ut
 
     def diffusion_coefficient(self, xt: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         """`

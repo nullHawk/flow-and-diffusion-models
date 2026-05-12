@@ -11,7 +11,7 @@ from torch.func import vmap, jacrev
 from tqdm import tqdm
 import seaborn as sns
 
-from package import ODE, SDE, Simulator, BrownianMotion, EulerSimulator, EulerMaruyamaSimulator
+from package import ODE, SDE, Simulator, BrownianMotion, EulerSimulator, EulerMaruyamaSimulator, OUProcess
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -122,4 +122,63 @@ ax.set_title(r'Trajectories of Brownian Motion with $\sigma=$' + str(sigma), fon
 ax.set_xlabel(r'time ($t$)', fontsize=18)
 ax.set_ylabel(r'$x_t$', fontsize=18)
 plot_trajectories_1d(x0, simulator, ts, ax, show_hist=True)
+plt.show()
+
+# Try comparing multiple choices side-by-side
+thetas_and_sigmas = [
+    (0.25, 0.0),
+    (0.25, 0.5),
+    (0.25, 2.0),
+]
+simulation_time = 10.0
+
+num_plots = len(thetas_and_sigmas)
+fig, axes = plt.subplots(2, num_plots, figsize=(10.5 * num_plots, 15))
+
+# Top row: dynamics
+n_traj = 10
+for idx, (theta, sigma) in enumerate(thetas_and_sigmas):
+    ou_process = OUProcess(theta, sigma)
+    simulator = EulerMaruyamaSimulator(sde=ou_process)
+    x0 = torch.linspace(-10.0,10.0,n_traj).view(-1,1).to(device) # Initial values - let's start at zero
+    ts = torch.linspace(0.0,simulation_time,1000).to(device) # simulation timesteps
+
+    ax = axes[0,idx]
+    ax.set_title(f'Trajectories of OU Process with $\\sigma = ${sigma}, $\\theta = ${theta}', fontsize=15)
+    plot_trajectories_1d(x0, simulator, ts, ax, show_hist=False)
+
+# Bottom row: distribution
+n_traj = 500
+for idx, (theta, sigma) in enumerate(thetas_and_sigmas):
+    ou_process = OUProcess(theta, sigma)
+    simulator = EulerMaruyamaSimulator(sde=ou_process)
+    x0 = torch.linspace(-10.0,10.0,n_traj).view(-1,1).to(device) # Initial values - let's start at zero
+    ts = torch.linspace(0.0,simulation_time,1000).to(device) # simulation timesteps
+
+    ax = axes[1,idx]
+    ax.set_title(f'Trajectories of OU Process with $\\sigma = ${sigma}, $\\theta = ${theta}', fontsize=15)
+    ax = plot_trajectories_1d(x0, simulator, ts, ax, show_hist=True, decouple_hist_axis=True)
+plt.show()
+
+# Let's compare various OU processes!
+sigmas = [1.0, 2.0, 10.0]
+ds = [0.25, 1.0, 4.0] # sigma**2 / 2t
+simulation_time = 15.0
+n_traj = 500
+
+fig, axes = plt.subplots(len(ds), len(sigmas), figsize=(8 * len(sigmas), 8 * len(ds)))
+axes = axes.reshape((len(ds), len(sigmas)))
+for d_idx, d in enumerate(ds):
+    for s_idx, sigma in enumerate(sigmas):
+        theta = sigma**2 / 2 / d
+        ou_process = OUProcess(theta, sigma)
+        simulator = EulerMaruyamaSimulator(sde=ou_process)
+        x0 = torch.linspace(-20.0,20.0,n_traj).view(-1,1).to(device)
+        time_scale = sigma**2
+        ts = torch.linspace(0.0,simulation_time / time_scale,1000).to(device) # simulation timesteps
+        ax = axes[d_idx, s_idx]
+        ax.set_title(f'OU Trajectories with Sigma={sigma}, Theta={theta}, D={d}')
+        plot_trajectories_1d(x0=x0, simulator=simulator, timesteps=ts, ax=ax, show_hist=True, decouple_hist_axis=True)
+        ax.set_xlabel(r'$t$')
+        ax.set_ylabel(r'X_t')
 plt.show()
